@@ -149,9 +149,6 @@ init_config(server_addr_config *config){
 	}
 	config->daemon_mode = 0;
 	config->verbose = 0;
-	if(config->config_file == NULL){
-		config->config_file = strdup("");
-	}
 	config->max_connections = 1024;
 }
 
