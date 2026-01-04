@@ -47,9 +47,10 @@ typedef struct{
 
 #define PROGRAM_NAME  "server"
 
+#define BACKLOG 2  // 等待连接队列的最大长度
 
+#define RECV_BUFF_SIZE 1024  //每次处理多少字节
 
-
-
+#define WORKER_COUNT 4  // 预创建的工作进程数 类似apche 预fork模式
 
 #endif

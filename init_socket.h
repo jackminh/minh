@@ -2,13 +2,11 @@
 #define __INIT_SOCKET_H
 #include "comm_socket.h"
 /*init socket*/
-void
-init_socket(int *sockfd,struct addrinfo *res,struct addrinfo *p, int *yes);
-/*init socket address*/
-void
-init_socket_address(struct addrinfo *hints,
-    struct addrinfo *res, 
-    server_addr_config * config
-);
+int create_listening_socket(const char *port);
 void print_error(int );
+void print_address_info(struct addrinfo *ai);
+void 
+handle_client(int client_fd, struct sockaddr_storage *client_addr);
+void 
+worker_loop(int sockfd, int worker_id);
 #endif
