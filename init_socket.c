@@ -115,7 +115,6 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
 // 工作进程的主循环
 void 
 worker_loop(int sockfd, int worker_id) {
-    // 工作进程不需要释放 config，因为只读
     while (1) {
         struct sockaddr_storage client_addr;
         socklen_t addr_len = sizeof(client_addr);

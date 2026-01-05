@@ -1,5 +1,5 @@
 PROG = server
-OBJS = server.o init_socket.o handler_pars.o
+OBJS = server.o init_socket.o handler_pars.o init_signal.o
 CFLAGS = -Wall -Wextra -Werror -I. -I./include -g
 CC = gcc
 
