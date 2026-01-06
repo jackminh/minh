@@ -25,30 +25,31 @@ main(int argc, char **argv){
         .config_file = NULL,
         .max_connections = 1024
     };
-    /* init config */
+    //初始化配置
     init_config(&config);
-    /*parse paraments*/
+    //解析参数
     handler_pars(argc,argv,&config); 
-    /*validate paraments*/
+    //校验参数
     if(validate_args(&config) < 0){
         print_usage(PROGRAM_NAME);
         exit(EXIT_FAILURE);
     }
     //设置主进程的名称
-    //strncpy(argv[0], "server-master", 13);
-    snprintf(argv[0],strlen(argv[0])+1,"server-master");
-
-    // 设置文件锁 防止工作进程在accept处理连接时出现惊群效应
+    char master_name[32];
+    snprintf(master_name, sizeof(master_name), "%s-master", PROGRAM_NAME);
+    strncpy(argv[0],master_name,strlen(master_name) + 1);
+    
+    //设置文件锁 防止工作进程在accept处理连接时出现惊群效应
     init_accept_lock();
 
-    /* int socket address */
+    //初始化套接字
     int sockfd = create_listening_socket(config.host,config.port);
     
-    //创建子进程来处理多个连接
-    pid_t worker_pids[WORKER_COUNT];
     //设置信号处理（在 fork 之前）
     setup_signals();
 
+    //创建子进程来处理多个连接
+    pid_t worker_pids[WORKER_COUNT];
     for (int i = 0; i < WORKER_COUNT; i++) {
         pid_t pid = fork();
         if(pid < 0) {
@@ -61,16 +62,17 @@ main(int argc, char **argv){
         }
         if(pid == 0) {  // 工作进程
             free_config(&config);
-            // ⭐ 工作进程设置自己的信号处理
+            //工作进程设置自己的信号处理
             setup_worker_signals();
 
+            //设置工作进程名称
             char worker_name[64];
-            snprintf(worker_name, sizeof(worker_name), 
-                    "%s-worker-%d", PROGRAM_NAME, i);
-            strncpy(argv[0], worker_name, 15);
-            //printf("工作进程 %d 启动 (PID: %d)\n", i, getpid());
+            snprintf(worker_name, sizeof(worker_name),"%s-worker-%d", PROGRAM_NAME, i);
+            strncpy(argv[0], worker_name, strlen(worker_name)+1);
+
+            //工作进程循环处理,不应该返回，如果返回了就是错误
             worker_loop(sockfd, i);
-            // worker_loop 不应该返回，如果返回了就是错误
+
             exit(EXIT_FAILURE);
         }else{
             //主进程记录子进程PID
@@ -79,6 +81,7 @@ main(int argc, char **argv){
     }
     //主进程关闭监听套接字
     close(sockfd);
+    
     //主进程循环:监控和管理子进程
     int running_workers = WORKER_COUNT;
 

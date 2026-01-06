@@ -155,25 +155,41 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
     HTTP_REQUEST hreq;
     parseRequest(buf, &hreq);
     //end
-    char url[500] = "https://stevens.netmeister.org";
-    strcat(url,hreq.path);
-    printf("请求url > %s\n",url);
-
-    char tempPath[256];
-    strcpy(tempPath, hreq.path);
-    char *file_name = basename(tempPath);
+    //设置默认文件
+    char defaul_path[12] = "/index.html";
+    if(strcmp(hreq.path,"/") == 0){
+        memcpy(hreq.path,defaul_path,sizeof(defaul_path)-1);
+    }
+    char *file_name = hreq.path;
     printf("文件名 > %s\n", file_name);
 
-    char local_file[100] = "./home/";
+    char local_file[100] = "./www";
     strcat(local_file,file_name);
+
+    int status = 200;
+    char *des = "OK";
+    //判断文件是否存在
+    if(access(local_file, F_OK) != 0) {
+        memset(local_file,0,strlen(local_file));
+        char not_fund[] = "./www/404.html";
+        status = 404;
+        des = "Not Found";
+        memcpy(local_file,not_fund,sizeof(not_fund)-1);
+    }
+    //检查读权限
+    if (access(local_file, R_OK) != 0) {
+        char forbid[] = "./www/forbid.html";
+        status = 403;
+        des = "Forbidden";
+        memcpy(local_file,forbid,sizeof(forbid)-1);
+    }
     printf("本地文件名 > %s\n", local_file);
 
-    int fd = download_and_open(url, local_file);
-    char *real_buf = NULL;
+    //读取文件响应body
+    int fd = open(local_file, O_RDONLY);
+    char *real_buf = NULL; //响应body
     ssize_t data_len = 0;
-
     if(fd >= 0){
-        printf("文件下载成功，fd = %d\n", fd);
         char bf[RECV_BUFF_SIZE];
         ssize_t size;
         while((size = read(fd, bf, sizeof(bf) - 1)) > 0){
@@ -186,25 +202,34 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
             perror("read");
         }
         close(fd);
-        unlink(local_file);
     }
-    fflush(stdout); 
+    
+    
+    //响应header
     char head[500];
     HTTP_RESPOND hres = {
         .status = 200,
-        .des = "ok",
+        .des = "OK",
         .type= "text/html",
         .length=0,
         .connection = "close"
     };
-    memset(&hres.protocol,0,sizeof(hres.protocol));
-    memcpy(&hres.protocol,&hreq.protocol,sizeof(hreq.protocol));
+    memset(hres.protocol,0,sizeof(hres.protocol));
+    memcpy(hres.protocol,hreq.protocol,sizeof(hreq.protocol));
+    hres.status = status;
+    memset(hres.des,0,strlen(hres.des));
+    memcpy(hres.des,des,strlen(des)+1);
     hres.length = data_len;
     constructHead(&hres, head);
 
-    char *respon = concat_strings_memcpy(head, real_buf);
+    //printf("响应头:%s\n",head);
+    //fflush(stdout); 
+
     //发送响应头和响应body
+    char *respon = concat_strings_memcpy(head, real_buf);
+
     send(client_fd, respon, strlen(respon), 0);
+
     if(n == 0) {
         free(buf);
         printf("客户端 %s:%d 断开连接\n", ipstr, port);

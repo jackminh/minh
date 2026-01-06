@@ -45,7 +45,7 @@ typedef struct{
 } server_addr_config;
  
 
-#define PROGRAM_NAME  "server"
+#define PROGRAM_NAME  "minh"
 
 #define BACKLOG 2  // 等待连接队列的最大长度
 
