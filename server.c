@@ -11,6 +11,7 @@
 #include "comm_socket.h"
 #include "handler_pars.h"
 #include "init_signal.h"
+#include "http.h"
 
 
 int 
@@ -33,7 +34,11 @@ main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
     //设置主进程的名称
-    strncpy(argv[0], "server-master", 13);
+    //strncpy(argv[0], "server-master", 13);
+    snprintf(argv[0],strlen(argv[0])+1,"server-master");
+
+    // 设置文件锁 防止工作进程在accept处理连接时出现惊群效应
+    init_accept_lock();
 
     /* int socket address */
     int sockfd = create_listening_socket(config.port);

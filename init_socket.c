@@ -7,10 +7,18 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/file.h>
 #include <fcntl.h>
+#include <semaphore.h>
+#include <libgen.h> 
+#include "http.h"
 #include "init_socket.h"
 #include "comm_socket.h"
+#include "http_curl.h"
 
+
+// 锁文件描述符
+static int lock_fd = -1;
 /*
  * 创建并绑定一个监听套接字
  * 返回: 成功返回套接字描述符，失败返回-1
@@ -77,6 +85,38 @@ create_listening_socket(const char *port)
 
     return sockfd;
 }
+
+
+
+
+void printShow(HTTP_REQUEST *hreq){
+    printf("%s\n",hreq->method);
+    printf("%s\n",hreq->path);
+    printf("%s\n",hreq->protocol);
+    printf("%s\n",hreq->connection);
+}
+
+
+// 将两个字符指针合并
+char *concat_strings_memcpy(const char *str1, const char *str2) {
+    if (!str1) str1 = "";
+    if (!str2) str2 = "";
+    
+    size_t len1 = strlen(str1);
+    size_t len2 = strlen(str2);
+    
+    char *result = malloc(len1 + len2 + 1);
+    if (!result) return NULL;
+    
+    memcpy(result, str1, len1);
+    memcpy(result + len1, str2, len2);
+    result[len1 + len2] = '\0';
+    
+    return result;
+}
+
+
+
 void 
 handle_client(int client_fd, struct sockaddr_storage *client_addr)
 {
@@ -96,31 +136,133 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
     printf("接受来自 %s:%d 的新连接\n", ipstr, port);
     
     // 处理客户端请求
-    char buffer[RECV_BUFF_SIZE];
-    ssize_t n;
-    while ((n = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[n] = '\0';
-        printf("收到消息: %s", buffer);
-        // 简单回显
-        send(client_fd, buffer, n, 0);
+    char buffer[RECV_BUFF_SIZE] = {};
+    char * buf = NULL;
+    ssize_t len = 0; //接收到的总字节
+    ssize_t n = 0;
+    while((n = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        //这里可以实现检测不同协议
+        //todo
+        buf = realloc(buf,len + n);
+        memcpy(buf+len,buffer,n);
+        len = len + n;
+        //检测接收到的数据中是否以\r\n\r\n结束
+        if(strstr(buf,"\r\n\r\n")){ 
+            break;
+        }
     }
+    //解析请求头
+    HTTP_REQUEST hreq;
+    parseRequest(buf, &hreq);
+    //end
+    char url[500] = "https://stevens.netmeister.org";
+    strcat(url,hreq.path);
+    printf("请求url > %s\n",url);
+
+    char tempPath[256];
+    strcpy(tempPath, hreq.path);
+    char *file_name = basename(tempPath);
+    printf("文件名 > %s\n", file_name);
+
+    char local_file[100] = "./home/";
+    strcat(local_file,file_name);
+    printf("本地文件名 > %s\n", local_file);
+
+    int fd = download_and_open(url, local_file);
+    char *real_buf = NULL;
+    ssize_t data_len = 0;
+
+    if(fd >= 0){
+        printf("文件下载成功，fd = %d\n", fd);
+        char bf[RECV_BUFF_SIZE];
+        ssize_t size;
+        while((size = read(fd, bf, sizeof(bf) - 1)) > 0){
+            real_buf = realloc(real_buf,data_len+size + 1);
+            memcpy(real_buf+data_len,bf,size+1);
+            data_len = data_len + size;
+        }
+        if(size < 0){
+            free(real_buf);
+            perror("read");
+        }
+        close(fd);
+        unlink(local_file);
+    }
+    fflush(stdout); 
+    char head[500];
+    HTTP_RESPOND hres = {
+        .status = 200,
+        .des = "ok",
+        .type= "text/html",
+        .length=0,
+        .connection = "close"
+    };
+    memset(&hres.protocol,0,sizeof(hres.protocol));
+    memcpy(&hres.protocol,&hreq.protocol,sizeof(hreq.protocol));
+    hres.length = data_len;
+    constructHead(&hres, head);
+
+    char *respon = concat_strings_memcpy(head, real_buf);
+    //发送响应头和响应body
+    send(client_fd, respon, strlen(respon), 0);
     if(n == 0) {
+        free(buf);
         printf("客户端 %s:%d 断开连接\n", ipstr, port);
     }else if (n < 0) {
+        free(buf);
         perror("recv");
-    } 
+    }else{
+        free(buf);
+    }
     close(client_fd);
 }
+
+
+
+
+
+
+// 初始化锁
+void 
+init_accept_lock() {
+    lock_fd = open("/tmp/accept.lock", O_CREAT | O_RDWR, 0644);
+    if (lock_fd < 0) {
+        perror("open lock file");
+        exit(1);
+    }
+}
+
+// 获取锁
+void 
+acquire_accept_lock() {
+    if(flock(lock_fd, LOCK_EX) < 0) {
+        perror("flock");
+        exit(1);
+    }
+}
+// 释放锁
+void 
+release_accept_lock() {
+    flock(lock_fd, LOCK_UN);
+}
+
+
 
 // 工作进程的主循环
 void 
 worker_loop(int sockfd, int worker_id) {
     while (1) {
+        //先获取锁   //防止惊群效应
+        acquire_accept_lock();
+        
         struct sockaddr_storage client_addr;
         socklen_t addr_len = sizeof(client_addr);
         int client_fd = accept(sockfd, 
                               (struct sockaddr *)&client_addr, 
                               &addr_len);
+        //立即释放锁
+        release_accept_lock();
+        
         if(client_fd == -1) {
             // 如果是被信号中断，继续
             if(errno == EINTR) continue;
@@ -134,7 +276,6 @@ worker_loop(int sockfd, int worker_id) {
         close(client_fd);
     }
 }
-
 
 void 
 print_address_info(struct addrinfo *ai){
@@ -179,26 +320,5 @@ print_address_info(struct addrinfo *ai){
     fflush(stdout);
 }
 
-void 
-print_error(int eno){
-    switch(eno){
-        case EACCES:
-            fprintf(stderr,"socket error#%d:%s\n",eno,EACCES_MSG);
-        case EAFNOSUPPORT:
-            fprintf(stderr,"socket error#%d:%s\n",eno,EAFNOSUPPORT_MSG); 
-        case EMFILE:
-            fprintf(stderr,"socket error#%d:%s\n",eno,EMFILE_MSG);
-        case ENFILE:
-            fprintf(stderr,"socket error#%d:%s\n",eno,ENFILE_MSG);
-        case ENOBUFS:
-            fprintf(stderr,"socket error#%d:%s\n",eno,ENOBUFS_MSG);
-        case ENOMEM:
-            fprintf(stderr,"socket error#%d:%s\n",eno,ENOMEM_MSG);
-        case EPROTONOSUPPORT:
-            fprintf(stderr,"socket error#%d:%s\n",eno,EPROTONOSUPPORT_MSG);
-        case EPROTOTYPE:
-            fprintf(stderr,"socket error#%d:%s\n",eno,EPROTOTYPE_MSG);
-    }
-}
 
 

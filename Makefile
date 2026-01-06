@@ -1,12 +1,12 @@
 PROG = server
-OBJS = server.o init_socket.o handler_pars.o init_signal.o
+OBJS = server.o init_socket.o handler_pars.o init_signal.o http.o http_curl.o
 CFLAGS = -Wall -Wextra -Werror -I. -I./include -g
 CC = gcc
 
 all:$(PROG)
 
 $(PROG):$(OBJS)
-	$(CC) $(OBJS) -o $@
+	$(CC) $(OBJS) -o $@ -lcurl
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
