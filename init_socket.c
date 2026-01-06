@@ -24,7 +24,7 @@ static int lock_fd = -1;
  * 返回: 成功返回套接字描述符，失败返回-1
  */
 int 
-create_listening_socket(const char *port)
+create_listening_socket(const char *host,const char *port)
 {
     struct addrinfo hints, *res, *p;
     int sockfd;
@@ -36,7 +36,7 @@ create_listening_socket(const char *port)
     hints.ai_flags    = AI_PASSIVE;        // 用于监听套接字，通配地址
     
     // 获取地址信息链表
-    int status = getaddrinfo(NULL, port, &hints, &res);
+    int status = getaddrinfo(host, port, &hints, &res);
     if (status != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         return -1;
@@ -216,10 +216,6 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
     }
     close(client_fd);
 }
-
-
-
-
 
 
 // 初始化锁

@@ -2,7 +2,7 @@
 #define __INIT_SOCKET_H
 #include "comm_socket.h"
 /*init socket*/
-int create_listening_socket(const char *port);
+int create_listening_socket(const char *host,const char *port);
 void print_error(int );
 void print_address_info(struct addrinfo *ai);
 void 

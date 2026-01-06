@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include "comm_socket.h"
 #include "handler_pars.h"
+#include "conf_parse.h"
 
 void 
 handler_pars(int argc, char ** argv,server_addr_config *config){
@@ -141,11 +142,17 @@ validate_args(server_addr_config * config){
 
 void 
 init_config(server_addr_config *config){
+    //加载配置
+    char filename[] = "./conf/server.conf";
+    parse_config(filename);
+
 	if(config->host == NULL){
-		config->host = strdup("0.0.0.0");
+        const char *host = get_config_string("server", "host","0.0.0.0");
+		config->host = strdup(host);
 	}
 	if(config->port == NULL){
-		config->port = strdup("8080");
+        const char *port = get_config_string("server", "port","8080");
+		config->port = strdup(port);
 	}
 	config->daemon_mode = 0;
 	config->verbose = 0;

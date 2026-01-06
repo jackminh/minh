@@ -52,25 +52,3 @@ int download_and_open(const char *url, const char *local_path) {
     int fd = open(local_path, O_RDONLY);
     return fd;
 }
-
-// int main() {
-//     const char *url = "https://stevens.netmeister.org/631/f25-hw1.html";
-//     const char *local_file = "./home/f25-hw1.html";
-    
-//     int fd = download_and_open(url, local_file);
-//     if (fd >= 0) {
-//         printf("文件下载成功，fd = %d\n", fd);
-        
-//         // 读取文件内容
-//         char buffer[1024];
-//         ssize_t n = read(fd, buffer, sizeof(buffer) - 1);
-//         if (n > 0) {
-//             buffer[n] = '\0';
-//             printf("内容：%s\n", buffer);
-//         }
-//         close(fd);
-//        // unlink(local_file);  // 删除临时文件
-//     }
-    
-//     return 0;
-// }

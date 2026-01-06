@@ -12,6 +12,7 @@
 #include "handler_pars.h"
 #include "init_signal.h"
 #include "http.h"
+#include "conf_parse.h"
 
 
 int 
@@ -41,7 +42,7 @@ main(int argc, char **argv){
     init_accept_lock();
 
     /* int socket address */
-    int sockfd = create_listening_socket(config.port);
+    int sockfd = create_listening_socket(config.host,config.port);
     
     //创建子进程来处理多个连接
     pid_t worker_pids[WORKER_COUNT];
