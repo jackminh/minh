@@ -158,7 +158,7 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
     //设置默认文件
     char defaul_path[12] = "/index.html";
     if(strcmp(hreq.path,"/") == 0){
-        memcpy(hreq.path,defaul_path,sizeof(defaul_path)-1);
+        memcpy(hreq.path,defaul_path,sizeof(defaul_path));
     }
     char *file_name = hreq.path;
     printf("文件名 > %s\n", file_name);
@@ -174,14 +174,14 @@ handle_client(int client_fd, struct sockaddr_storage *client_addr)
         char not_fund[] = "./www/404.html";
         status = 404;
         des = "Not Found";
-        memcpy(local_file,not_fund,sizeof(not_fund)-1);
+        memcpy(local_file,not_fund,sizeof(not_fund));
     }
     //检查读权限
     if (access(local_file, R_OK) != 0) {
-        char forbid[] = "./www/forbid.html";
+        char forbid[] = "./www/403.html";
         status = 403;
         des = "Forbidden";
-        memcpy(local_file,forbid,sizeof(forbid)-1);
+        memcpy(local_file,forbid,sizeof(forbid));
     }
     printf("本地文件名 > %s\n", local_file);
 
