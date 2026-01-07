@@ -13,6 +13,7 @@
 #include "init_signal.h"
 #include "http.h"
 #include "conf_parse.h"
+#include "comm_func.h"
 
 
 int 
@@ -35,10 +36,8 @@ main(int argc, char **argv){
         exit(EXIT_FAILURE);
     }
     //设置主进程的名称
-    char master_name[32];
-    snprintf(master_name, sizeof(master_name), "%s-master", PROGRAM_NAME);
-    strncpy(argv[0],master_name,strlen(master_name) + 1);
-    
+    set_worker_process_name(argv, PROGRAM_NAME, 1, 0);
+
     //设置文件锁 防止工作进程在accept处理连接时出现惊群效应
     init_accept_lock();
 
@@ -66,9 +65,7 @@ main(int argc, char **argv){
             setup_worker_signals();
 
             //设置工作进程名称
-            char worker_name[64];
-            snprintf(worker_name, sizeof(worker_name),"%s-worker-%d", PROGRAM_NAME, i);
-            strncpy(argv[0], worker_name, strlen(worker_name)+1);
+            set_worker_process_name(argv, PROGRAM_NAME, 0, i);
 
             //工作进程循环处理,不应该返回，如果返回了就是错误
             worker_loop(sockfd, i);

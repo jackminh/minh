@@ -6,6 +6,7 @@
 #include "comm_socket.h"
 #include "handler_pars.h"
 #include "conf_parse.h"
+#include "comm_func.h"
 
 void 
 handler_pars(int argc, char ** argv,server_addr_config *config){
@@ -148,14 +149,14 @@ init_config(server_addr_config *config){
 
 	if(config->host == NULL){
         const char *host = get_config_string("server", "host","0.0.0.0");
-		config->host = strdup(host);
+		config->host = clear_string_head_tail_space(host);
 	}
 	if(config->port == NULL){
         const char *port = get_config_string("server", "port","8080");
-		config->port = strdup(port);
+		config->port = clear_string_head_tail_space(port);
 	}
-	config->daemon_mode = 0;
-	config->verbose = 0;
-	config->max_connections = 1024;
+	config->daemon_mode = get_config_bool("server", "daemon_mode", 0);
+	config->verbose = get_config_bool("server", "verbose", 0);
+	config->max_connections = get_config_int("server", "max_connections", 1024); 
 }
 
