@@ -1,139 +1,111 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <string.h>
+#include <stdio.h>
 #include <unistd.h>
-#include <errno.h>
-#include <signal.h>
-#include "init_socket.h"
-#include "comm_socket.h"
-#include "handler_pars.h"
-#include "init_signal.h"
-#include "http.h"
-#include "conf_parse.h"
-#include "comm_func.h"
+#include <string.h>
+#include "parameter.h"
+#include "socket.h"
+#include "time.h"
+#include "server.h"
+#include "protocol.h"
+#include <sys/types.h>         
+#include <sys/socket.h>
+//http协议
+#include "protocol/http/http.h"
+#include "log/log.h"
+
+//主体和端口配置
+PARAMENT config = {0};
+
+//终结服务器
+void
+deinitServer(){
+	//释放内存空间
+	free(config.host);
+}
+//初始化服务器
+int 
+initServer(int argc, char **argv){
+	printLog("%d > 开始解析命令行参数\n", getpid());
+	if(parseCommandParaments(argc, argv, &config) != 0){
+		return -1;
+	}
+	//初始化套接字
+	if(initSocket(config.host, config.port)==-1){
+		return -1;
+	}
+	return 0;
+}
 
 
 int 
-main(int argc, char **argv){
-    server_addr_config config = {
-        .host = NULL,
-        .port = NULL,
-        .daemon_mode = 0,
-        .verbose = 0,
-        .config_file = NULL,
-        .max_connections = 1024
-    };
-    //初始化配置
-    init_config(&config);
-    //解析参数
-    handler_pars(argc,argv,&config); 
-    //校验参数
-    if(validate_args(&config) < 0){
-        print_usage(PROGRAM_NAME);
-        exit(EXIT_FAILURE);
-    }
-    //设置主进程的名称
-    set_worker_process_name(argv, PROGRAM_NAME, 1, 0);
-
-    //设置文件锁 防止工作进程在accept处理连接时出现惊群效应
-    init_accept_lock();
-
-    //初始化套接字
-    int sockfd = create_listening_socket(config.host,config.port);
-    
-    //设置信号处理（在 fork 之前）
-    setup_signals();
-
-    //创建子进程来处理多个连接
-    pid_t worker_pids[WORKER_COUNT];
-    for (int i = 0; i < WORKER_COUNT; i++) {
-        pid_t pid = fork();
-        if(pid < 0) {
-            perror("fork");
-            for(int j=0;j<i;j++){
-                kill(worker_pids[j], SIGTERM);
-            }
-            sleep(1);
-            exit(EXIT_FAILURE);
+runServer(const char *home) {
+    printLog("%d > 资源目录:%s\n", getpid(), home);
+    for(;;) {
+        int conn;
+        // 1. 首先接受客户端连接
+        if((conn = acceptClient()) == -1) {
+            printLog("accept失败\n");
+            continue;
         }
-        if(pid == 0) {  // 工作进程
-            free_config(&config);
-            //工作进程设置自己的信号处理
-            setup_worker_signals();
-
-            //设置工作进程名称
-            set_worker_process_name(argv, PROGRAM_NAME, 0, i);
-
-            //工作进程循环处理,不应该返回，如果返回了就是错误
-            worker_loop(sockfd, i);
-
-            exit(EXIT_FAILURE);
-        }else{
-            //主进程记录子进程PID
-            worker_pids[i] = pid;
-        }
-    }
-    //主进程关闭监听套接字
-    close(sockfd);
-    
-    //主进程循环:监控和管理子进程
-    int running_workers = WORKER_COUNT;
-
-    while(!stop_server && running_workers > 0){
-        //检查是否需要重载配置
-        //todo
-
-
-        //检查是否有工作进程异常退出
-        for(int i=0;i<WORKER_COUNT;i++){
-            if(worker_pids[i] > 0){
-                if(kill(worker_pids[i],0) == -1 && errno == ESRCH){
-                    worker_pids[i] = 0;
-                    running_workers--;
-                    //重新启动工作进程
-                    //todo
+        // 2. 设置初始接收超时
+        struct timeval tv = {30, 0};
+        setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        
+        // 3. 处理这个连接上的所有请求（Keep-Alive）
+        int keep_alive = 1;
+        int request_count = 0;
+        
+        while (keep_alive) {
+            HttpRequest request = {};
+            request_count++;
+            printLog("\n\n%d > ================start===========================\n",getpid()); 
+            printLog("%d > 等待第 %d 个请求...\n", getpid(), request_count);
+            
+            // 4. 接收请求
+            char *req = recvRequest(conn);
+            
+            if(req != NULL && strlen(req) > 0) {
+                size_t len = strlen(req);
+                ProtocolInfo info = detectProtocol(req, len);
+                
+                if (info.type == PROTOCOL_WEBSOCKET) {
+                    printLog("websocket: %s\n", req);
+                } else if (info.type == PROTOCOL_HTTP) {
+                    // 处理HTTP请求
+                    handleHttpRequest(conn, &request, req, home);
+                    // 判断是否保持连接
+                    if(shouldCloseConnection(&request) < 0) {
+                        keep_alive = 0;
+                        printLog("%d > 客户端要求关闭连接\n", getpid());
+                    } else {
+                        printLog("%d > Keep-Alive连接，等待下一个请求\n", getpid());
+                    }
                 }
+                free(req);
+            }else {
+                // recv返回NULL或超时
+                printLog("%d > 接收超时或连接关闭\n", getpid());
+                keep_alive = 0;  // 退出循环
+            }
+            printLog("%d > ==================end===========================\n",getpid()); 
+            // 5. 清理请求结构
+            freeHttpRequest(&request);
+            
+            // 6. 如果保持连接，调整超时时间
+            if (keep_alive) {
+                // 对于Keep-Alive，设置较短的空闲超时（比如5秒）
+                tv.tv_sec = 5;
+                tv.tv_usec = 0;
+                setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
             }
         }
-
-        sleep(1);
-
-
+        
+        // 7. 关闭连接
+        close(conn);
+        printLog("%d > 连接关闭，共处理 %d 个请求\n", getpid(), request_count);
     }
-
-
-    //优雅关闭:通知所有工作进程退出
-    printf("主进程开始优雅关闭...");
     
-    for(int i=0; i< WORKER_COUNT;i++){
-        if(worker_pids[i] > 0){
-            //通知工作进程退出
-            kill(worker_pids[i],SIGTERM);
-        }
-    }
-    //待工作进程退出
-    int timeout = 10;
-    while(timeout-- > 0 && running_workers > 0){
-        sleep(1);
-        for(int i=0;i<WORKER_COUNT;i++){
-            if(worker_pids[i] > 0 && kill(worker_pids[i],0) == -1){
-                worker_pids[i] = 0;
-                running_workers--;
-            }
-        }
-    }
-    if(running_workers > 0){
-        for(int i=0;i<WORKER_COUNT;i++){
-            if(worker_pids[i] > 0){
-                kill(worker_pids[i],SIGKILL);
-            }
-        }
-        sleep(1);
-    }
-    free_config(&config);
-    printf("服务器正常关闭\n");
-    exit(EXIT_SUCCESS);
+    return 0;
 }
+
+
