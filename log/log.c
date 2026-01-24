@@ -14,39 +14,22 @@
 static int 
 getDebugModeSafe(){
     int debug = 0;
-    
-    char *d_env = getenv("DEBUG");
-    if (!d_env) {
+    char *debug_env = getenv("DEBUG");
+    if(!debug_env){
         return debug;
     }
-    
-    // 计算需要的缓冲区大小
-    size_t len = strlen(d_env);
-    if (len == 0) {
-        return debug;
-    }
-    
-    // 分配足够的内存（包括终止符）
-    char *debug_env = (char *)malloc(len + 1);
-    if (!debug_env) {
-        perror("内存分配失败");
-        return debug;
-    }
-    
-    // 复制并转换为小写
-    for (size_t i = 0; i < len; i++) {
-        debug_env[i] = tolower(d_env[i]);
-    }
-    debug_env[len] = '\0';
-    // 检查布尔值
-    if (strcmp(debug_env, "true") == 0 ||
-        strcmp(debug_env, "1") == 0 ||
-        strcmp(debug_env, "yes") == 0 ||
-        strcmp(debug_env, "on") == 0) {
+    //比较
+    if(strcasecmp(debug_env,"true") == 0
+      || strcasecmp(debug_env,"yes") == 0
+      || strcasecmp(debug_env,"1") == 0
+      || strcasecmp(debug_env,"enable")==0
+      || strcasecmp(debug_env,"on") == 0)
+    {
         debug = 1;
     }
-    free(debug_env);
+
     return debug;
+
 }
 
 

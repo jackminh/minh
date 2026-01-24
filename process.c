@@ -17,7 +17,7 @@ const char *server_home = NULL;
 
 //创建多进程
 void
-runMutilProcessServer(const char *home, int (*func)(const char * home)){
+runMutilProcessServer(const char *home, Func func){
 	printLog("%d > 设置主进程名称\n", getpid());
 	//设置主进程名
     set_process_name("minhd");
