@@ -1,6 +1,6 @@
 PROG = minh-server
-OBJS = main.o parameter.o socket.o protocol.o server.o process.o signals.o procname_common.o protocol/http/http.o log/log.o
-CFLAGS = -Wall -Wextra -Werror -I. -I./include -I./log -I./protocol -I./protocol/http -I./protocol/websocket -g
+OBJS = main.o parameter.o socket.o protocol.o server.o process.o signals.o procname_common.o protocol/http/http.o log/log.o select/select.o
+CFLAGS = -Wall -Wextra -Werror -I. -I./include -I./log -I./select -I./protocol -I./protocol/http -I./protocol/websocket -g
 CC = gcc
 
 all:$(PROG)

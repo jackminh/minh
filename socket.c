@@ -10,8 +10,10 @@
 #include <string.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 #include "socket.h"
 #include "log/log.h"
+#include "select/select.h"
 
 // 检查缓冲区中是否包含完整的 HTTP 头部
 static int 
@@ -32,7 +34,7 @@ isChunkedBodyComplete(const char *body, size_t body_len);
 static int sockfd = -1;
 //初始化socket
 int 
-initSocket(const char * host, short port){
+initSocket(const char * host, short port, const char *mode){
 	printLog("%d > 解析命令行参数 host:%s, port:%hd\n",getpid(),host,port);
 	int yes = 1;
 	struct addrinfo hints, *p ,*res;
@@ -105,21 +107,38 @@ initSocket(const char * host, short port){
         return -1;
     }
     //////////////////////////////////
-    //获取当前文件描述符标志
-    // int flags = fcntl(sockfd, F_GETFL, 0);
-    // if(flags < 0){
-    //     fprintf(stderr, "fcntl F_GETFL error: %s\n", strerror(errno));
-    //     close(sockfd);
-    //     return -1;
-    // }
-    // //添加非阻塞标志 防止accept时阻塞在socket()函数处
-    // if(fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-    //     fprintf(stderr, "fcntl F_SETFL O_NONBLOCK error:%s\n", strerror(errno));
-    //     close(sockfd);
-    //     return -1;
-    // }
-    ///////////////////////////////
+    if(strcasecmp(mode, "select") == 0){
+        //获取当前文件描述符标志
+        int flags = fcntl(sockfd, F_GETFL, 0);
+        if(flags < 0){
+            fprintf(stderr, "fcntl F_GETFL error: %s\n", strerror(errno));
+            close(sockfd);
+            return -1;
+        }
+        //添加非阻塞标志 防止accept时阻塞在socket()函数处
+        if(fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+            fprintf(stderr, "fcntl F_SETFL O_NONBLOCK error:%s\n", strerror(errno));
+            close(sockfd);
+            return -1;
+        }
+        //初始化服务器信息
+        server_state.listen_fd  = sockfd;
+        server_state.client_count = 0;
+        server_state.max_fd = sockfd;
+        // 初始化fd_set
+        FD_ZERO(&server_state.master_fds);
+        FD_SET(sockfd, &server_state.master_fds);
 
+        // 设置select超时（5秒）
+        server_state.timeout.tv_sec = 5;
+        server_state.timeout.tv_usec = 0;
+
+        // 初始化客户端数组
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            server_state.clients[i].fd = -1;
+        }
+
+    }
     //监听sockfd前设置为非阻塞
     if(listen(sockfd,BACKLOG) !=0){
     	close(sockfd);
@@ -153,21 +172,6 @@ acceptClient(void){
     	client_port = ntohs(sin6->sin6_port);
     }
 	printLog("%d > 接收到 %s:%d 的连接\n", getpid(),client_addr,client_port);
-	//设置 连接conn为非阻塞
-	// int flags = fcntl(conn, F_GETFL, 0);
-    // if(flags < 0){
-    //     fprintf(stderr, "fcntl F_GETFL error: %s\n", strerror(errno));
-    //     close(conn);
-    //     return -1;
-    // }
-    // //添加非阻塞标志 防止recv/send时阻塞在accept()函数处
-    // if(fcntl(conn, F_SETFL, flags | O_NONBLOCK) < 0) {
-    //     fprintf(stderr, "fcntl F_SETFL O_NONBLOCK error:%s\n", strerror(errno));
-    //     close(conn);
-    //     return -1;
-    // }
-    ///////////////
-    
 	return conn;
 }
 
@@ -334,8 +338,6 @@ recvRequest(int conn) {
     
     return req;
 }
-
-
 
 // 检查缓冲区中是否包含完整的 HTTP 头部
 static int 

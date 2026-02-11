@@ -6,6 +6,7 @@
 typedef struct {
 	char* host;
 	int port;
+	char *mode ;  //使用哪种I/O模式
 }PARAMENT;
 
 

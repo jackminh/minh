@@ -1,6 +1,8 @@
 /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk/usr/include/
 https://www.man7.org/linux/man-pages/man3/sockaddr.3type.html
 
+https://man.archlinux.org/man/memcpy.3.en (需要梯子)
+
 https://insecure.org/stf/smashstack.html
 
 

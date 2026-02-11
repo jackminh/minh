@@ -5,7 +5,7 @@
 
 //初始化socket
 int 
-initSocket(const char * host, short port);
+initSocket(const char * host, short port, const char *mode);
 
 //等待客户端连接
 int

@@ -9,6 +9,8 @@
 
 #include "parameter.h"
 
+#define DEFAULT_MODE "blocking"
+
 //打印输出帮助
 void 
 usage(const char *program_name){
@@ -17,9 +19,10 @@ usage(const char *program_name){
 	fprintf(stderr, "  -h, --help				 	显示此帮助信息\n");
 	fprintf(stderr, "  -a, --address <IP>				绑定IP地址(必需)\n");
 	fprintf(stderr, "  -p, --port <PORT>      			绑定端口号(必需)\n");
+	fprintf(stderr, "  -m, --mode <MODE>				I/O模式\n");
     fprintf(stderr, "示例:\n");
-    fprintf(stderr, "  %s -p 8080 -a 127.0.0.1\n",program_name);
-    fprintf(stderr, "  %s --port 8080 --address 127.0.0.1\n", program_name);
+    fprintf(stderr, "  %s -p 8080 -a 127.0.0.1 -m select\n",program_name);
+    fprintf(stderr, "  %s --port 8080 --address 127.0.0.1 --mode select\n", program_name);
 }
 
 //校验解析出来的参数是否有效
@@ -44,6 +47,9 @@ int
 parseCommandParaments(int argc, char **argv, PARAMENT *config)
 {
 	memset(config,0,sizeof(PARAMENT));  //初始化配置中host为NULL,port为0
+
+	config->mode = strdup(DEFAULT_MODE); //设置默认为阻塞模式
+
 	if(argc == 1){
 		config->host = strdup("0.0.0.0");
 		config->port = 9527;
@@ -53,12 +59,13 @@ parseCommandParaments(int argc, char **argv, PARAMENT *config)
 		{ "help", no_argument, NULL, 'h' },
 		{ "port", required_argument, NULL, 'p' },
 		{ "address", required_argument, NULL,'a' },
+		{ "mode", required_argument, NULL, 'm'},
 		{0, 0, 0, 0}
 	};
 	int ch;
 	char* endptr;
 	long port;
-    while((ch=getopt_long(argc, argv, "hp:a:",longopts, NULL)) != -1){
+    while((ch=getopt_long(argc, argv, "hp:a:m:",longopts, NULL)) != -1){
     	switch(ch){
     	case 'h':
     		usage(argv[0]);
@@ -76,6 +83,16 @@ parseCommandParaments(int argc, char **argv, PARAMENT *config)
     		}
     		config->host = strdup(optarg); //主机
     		if(config->host == NULL){
+    			fprintf(stderr,"内存分配置失败\n");
+    			return -1;
+    		}
+    		break;
+    	case 'm':
+    		if(config->mode != NULL){
+    			free(config->mode);
+    		}
+    		config->mode = strdup(optarg); //I/O模式
+    		if(config->mode == NULL){
     			fprintf(stderr,"内存分配置失败\n");
     			return -1;
     		}
