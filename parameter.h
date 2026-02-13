@@ -9,6 +9,7 @@ typedef struct {
 	char *mode ;  //使用哪种I/O模式
 }PARAMENT;
 
+extern PARAMENT *server_config; //全局参数配置
 
 //解析命令行参数,返回解析后的参数结构体
 int

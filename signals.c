@@ -92,10 +92,9 @@ void restartWorker(int worker_id) {
             
             extern int (*server_func)(const char *, PARAMENT *config);
             extern const char *server_home;
-            extern PARAMENT *server_config;
-            
+
             if(server_func && server_home){
-                server_func(server_home, server_config);
+                server_func(server_home, server_config); //server_config来自全局变量
             }
             exit(0);
         } else if (pid > 0) {

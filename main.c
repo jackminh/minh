@@ -10,6 +10,7 @@
 
 //主体和端口配置
 PARAMENT config = {0};
+PARAMENT *server_config = NULL;
 
 int 
 main(int argc, char **argv){
@@ -17,6 +18,7 @@ main(int argc, char **argv){
 	if(parseCommandParaments(argc, argv, &config) != 0){
 		return -1;
 	}
+	server_config = &config;
 	//运行多进程服务器
 	const char * home = "./www";
 	//初始化服务器
