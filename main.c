@@ -19,22 +19,12 @@ main(int argc, char **argv){
 	}
 	//运行多进程服务器
 	const char * home = "./www";
-	if(strcasecmp(config.mode,"blocking")==0){       //默认阻塞模式
-		//初始化服务器
-		if(initServer(&config)){
-			exit(EXIT_FAILURE);
-		}
-		runMutilProcessServer(home,runServer);
-	}else if(strcasecmp(config.mode, "select") == 0){  //select 模式
-		//初始化服务器
-		if(initSelectServer(&config)){
-			exit(EXIT_FAILURE);
-		}
-		runMutilProcessServer(home,runSelectServer);
-	}else if(strcasecmp(config.mode, "epoll") == 0){   //epoll模式
-		//todo
-		printf("epoll\n");
+	//初始化服务器
+	if(initServer(&config)){
+		exit(EXIT_FAILURE);
 	}
+	//运行服务器
+	runMutilProcessServer(home,&config,runServer);
 	//终结服务器
 	deinitServer(&config);
 

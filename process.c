@@ -9,15 +9,15 @@
 #include "process.h"
 #include "log/log.h"
 #include "procname_common.h"
-
+#include "parameter.h"
 
 // 全局变量，用于重启时调用
-int (*server_func)(const char *) = NULL;
+int (*server_func)(const char *, PARAMENT *config) = NULL;
 const char *server_home = NULL;
 
 //创建多进程
 void
-runMutilProcessServer(const char *home, Func func){
+runMutilProcessServer(const char *home, PARAMENT * config, Func func){
 	printLog("%d > 设置主进程名称\n", getpid());
 	//设置主进程名
     set_process_name("minhd");
@@ -28,6 +28,7 @@ runMutilProcessServer(const char *home, Func func){
     // 保存函数指针和参数，用于重启
     server_func = func;
     server_home = home;
+
 
     // 设置信号处理器
     printLog("%d > 设置信号处理...\n", getpid());
@@ -52,7 +53,7 @@ runMutilProcessServer(const char *home, Func func){
             signal(SIGINT,  SIG_DFL);
             signal(SIGTERM, SIG_DFL);
             // 执行服务器函数
-            func(home);
+            func(home, config);
             // 退出子进程
             exit(0);
         } else {
