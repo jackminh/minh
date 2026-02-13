@@ -7,6 +7,9 @@
 #include <signal.h>
 #include "log/log.h"
 #include "signals.h"
+#include "parameter.h"
+
+
 
 pid_t worker_pids[MAX_PROCESS] = {0};
 volatile sig_atomic_t server_running = 1;
@@ -87,11 +90,12 @@ void restartWorker(int worker_id) {
             // 子进程
             printLog("%d > 重启工作进程 %d (新PID: %d)\n", getppid(), worker_id, getpid());
             
-            extern int (*server_func)(const char *);
+            extern int (*server_func)(const char *, PARAMENT *config);
             extern const char *server_home;
+            extern PARAMENT *server_config;
             
             if(server_func && server_home){
-                server_func(server_home);
+                server_func(server_home, server_config);
             }
             exit(0);
         } else if (pid > 0) {
